@@ -1,0 +1,248 @@
+﻿class Program
+    {
+        static void Main(string[] args)
+        {
+            GameRun gamerun = new GameRun();
+
+            //Main method for game.
+            gamerun.Run();
+        }
+    }
+
+
+class GameRun
+    {
+        private string user_input, movement;
+        private bool running = true, game_continue = true, correct_input = true, correct_room = false, same_setting = false;
+        private int pos = -1, saved_pos = -1;
+        private Random ran = new Random();
+        private Map map = new Map();
+        private Map saved_map;
+        private Hero hero = new Hero();
+        private Wumpus wumpus = new Wumpus();
+
+        //Main loop of game. Runs the main game and the option for player to replay game with same settings, different settings, or quit
+        public void Run()
+        {
+
+            while (game_continue)
+            {
+                System.Console.WriteLine("Welcome to \"Hunt the Wumpus!\". \nTry to kill the Wumpus before you get yourself killed :)\n\n");
+
+                /*
+                *Decides if game is new, then start off with new settings.
+                */
+
+                if (same_setting)
+                    sameSettings();
+                else
+                    newSettings();
+                /*
+                *positions the player and the wumpus
+                */
+                wumpus.setMap(map, map.whereWumpus());
+                hero.setMap(map, pos);
+
+                gameLoop();
+                
+                /*
+                *Option to replay starts here
+                */
+                System.Console.Write("Would you like to play again? (Enter Y or N) ");
+                user_input = System.Console.ReadLine();
+
+                while (string.Compare(user_input, 0, "Y", 0, 1, true) != 0 && string.Compare(user_input, 0, "N", 0, 1, true) != 0)
+                {
+                    System.Console.Write("Please enter Y or N: ");
+                    user_input = System.Console.ReadLine();
+                }
+
+                /*
+                 * if user would like to replay same map/settings
+                */
+                if (string.Compare(user_input, 0, "y", 0, 1, true) == 0)
+                {
+                    running = true;
+                    hero = new Hero();
+                    System.Console.WriteLine("\n");
+
+                    System.Console.Write("Would you like to play with same settings? (Enter Y or N) ");
+
+                    user_input = System.Console.ReadLine();
+
+                    if (string.Compare(user_input, 0, "n", 0, 1, true) == 0)
+                    {
+                        System.Console.WriteLine("\n\n");
+                    }
+                    else if (string.Compare(user_input, 0, "y", 0, 1, true) == 0)
+                    {
+                        System.Console.WriteLine("\n\n");
+                        same_setting = true;
+                    }
+                }
+                else
+                {
+                    game_continue = false;
+                }
+            }
+                
+
+            System.Console.Write("\nPress any key to exit...");
+            System.Console.ReadKey();
+        }
+
+        //Place the user where the starting location isn't in a danger zone.
+        private int startPosition()
+        {
+            int start = ran.Next(20);
+
+            while (map.checkRoom(start))
+            {
+                start = ran.Next(20);
+            }
+
+            return start; 
+        }
+
+        //initialize map where hazards and player are in random rooms
+        private void newSettings()
+        {
+            map.initialize_rooms();
+            saved_map = map;
+
+            pos = startPosition();
+            saved_pos = pos;
+        }
+
+        //replays the same setting as last game
+        private void sameSettings()
+        {
+            map = saved_map;
+
+            pos = saved_pos;
+
+            same_setting = false;
+        }
+
+
+        /*
+         * Main game loop 
+         */
+        private void gameLoop()
+        {
+            while (running)
+            {
+                //Check for hazards if player is in the same room as them
+                if (map.isWumpusRoom(pos))
+                {
+                    break;
+                }
+
+                if (map.isSuperBatsRoom(pos))
+                {
+                    pos = startPosition();
+                }
+
+                if (map.isPitRoom(pos))
+                {
+                    break;
+                }
+
+                /*
+                 *Give players option of whether to shoot, move, or quit while seeing if player has inputted a proper command. 
+                 */
+                while (correct_input)
+                {
+                    map.checkNeighbors(pos);
+                    System.Console.WriteLine("You are in room " + map.getRoom(pos).getRoomNumber());
+                    System.Console.WriteLine("Tunnels lead to " + map.getRoom(pos).printNeighbors());
+                    System.Console.Write("Shoot, Move, or Quite (S-M-Q)? ");
+                    user_input = System.Console.ReadLine();
+                    /*
+                    *If user enters "S", the user shoots an arrow up to 5 rooms. User only have 5 arrows.
+                    */
+                    if (string.Compare(user_input, 0, "S", 0, 1, true) == 0)
+                    {
+                        //System.Console.WriteLine(map.whereWumpus());
+						//add text - "How many rooms would you like to shoot through? (0-5) "
+                        hero.shoot();        
+						
+                        correct_input = false;
+
+                        /*
+                         * Check to see if player has shot wumpus, shot self, or missed.
+                        */
+                        if (hero.shotWumpus())
+                        {
+                            running = false;
+                            System.Console.WriteLine("You won the game, but don't be too cheeky! The wumpus will get you next time :3\n");
+                        }
+                        else if (hero.shotSelf())
+                        {
+                            running = false;
+                            System.Console.WriteLine("\n\nOwch! You shot yourself!!... didn't expect that.\n\nGame Over!\n\n");
+                        }
+                        else if (!hero.shotWumpus() && map.wumpusNearby(pos))
+                        {
+                            System.Console.WriteLine("\nThe scent of wumpus became faint. It woke up and moved.");
+
+                            map.moveWumpus();
+                            while (map.whereWumpus() == pos)
+                            {
+                                map.moveWumpus();
+                                wumpus.movePosition(map.whereWumpus());
+                            }
+
+                        }
+                    }
+                    //If user enters "M", the user moves to that room. 
+                    else if (string.Compare(user_input, 0, "M", 0, 1, true) == 0)
+                    {
+                        System.Console.Write("Where to? ");
+                        movement = System.Console.ReadLine();
+
+                        //Check current room's neighbors for validity.
+                        for (int i = 0; i < 3; i++)
+                        {
+                            string neighbor = map.getRoom(pos).getNeighbor(i).ToString();
+                            if (string.Compare(movement, neighbor, true) == 0)
+                            {
+                                pos = map.getRoom(pos).getNeighbor(i) - 1;
+                                correct_input = false;
+                                correct_room = true;
+                            }
+                        }
+
+                        if (!correct_room)
+                        {
+                            System.Console.WriteLine("\nYou can't go into that room.");
+                        }
+
+                        hero.movePosition(pos);
+                        System.Console.WriteLine("\n\n");
+
+                    }
+                    //If user enters "Q", the user quits.
+                    else if (string.Compare(user_input, 0, "Q", 0, 1, true) == 0)
+                    {
+                        running = false;
+                        System.Console.WriteLine("\nYou didn't even try that hard. Why'd you quit?!\n\n");
+                        correct_input = false;
+                    }
+                    else
+                    {
+                        System.Console.WriteLine("\nPlease enter a valid command.\n");
+                    }
+                }
+
+                correct_input = true;
+
+                //If player runs out of arrows, then game is over.
+                if (!hero.haveArrows())
+                {
+                    System.Console.WriteLine("\nYou just used your last arrow! Can't do anything now...\n\nGame Over!\n\n");
+                    running = false;
+                }
+            }
+        }
+    }
